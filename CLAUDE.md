@@ -28,11 +28,15 @@ for relevant code changes. `bun run dev` starts WXT. `bun run icons` regenerates
   originals. Wrapped frets use the CSS Custom Highlight API. A MutationObserver
   re-applies after re-renders; it is disconnected during our own writes.
 - `entrypoints/background.ts`: per-tab badge text and idle/active icon, cleared
-  when the tab starts loading.
+  when the tab starts loading. With "Follow Riff" on, it also asks the Riff app
+  (`lib/riff.ts`, `GET http://127.0.0.1:47813/api/transpose`) on each page load
+  or SPA navigation, then injects and sends `set` when Riff returns nonzero frets.
+  Riff does all the tuning math.
 - `entrypoints/popup/App.tsx`: − value + control. The content script is the
   source of truth.
 
-Keep the minimal activeTab + scripting permissions with no host permissions or
-declared content scripts. Units: state is stored in frets; the UI shows steps
+Keep the minimal activeTab + scripting permissions with no required host
+permissions or declared content scripts. "Follow Riff" is the only thing that
+uses the optional `http(s)://*/*` host permission, which the popup requests. Units: state is stored in frets; the UI shows steps
 (`lib/steps.ts`). Live DOM checks are still needed when changing detection or
 DOM-editing code. Unit tests don't cover the DOM.

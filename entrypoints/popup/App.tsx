@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampFrets, formatSteps, MAX_FRETS, stepLabel } from '@/lib/steps';
 import type { ContentRequest, ContentState } from '@/lib/messages';
+import { askRiff, dropRiffAccess, hasRiffAccess, requestRiffAccess, riffSummary, type RiffTranspose } from '@/lib/riff';
 
 type View =
   | { status: 'loading' }
   | { status: 'unavailable' }
-  | ({ status: 'ready'; tabId: number } & ContentState);
+  | ({ status: 'ready'; tabId: number; url: string } & ContentState);
 
 const request = (tabId: number, msg: ContentRequest) =>
   browser.tabs.sendMessage(tabId, msg) as Promise<ContentState>;
@@ -15,7 +16,7 @@ async function connect(): Promise<View> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (tab?.id == null) throw new Error('No active tab');
   await browser.scripting.executeScript({ target: { tabId: tab.id }, files: ['/content-scripts/content.js'] });
-  return { status: 'ready', tabId: tab.id, ...(await request(tab.id, { type: 'get' })) };
+  return { status: 'ready', tabId: tab.id, url: tab.url ?? '', ...(await request(tab.id, { type: 'get' })) };
 }
 
 export default function App() {
@@ -94,6 +95,50 @@ export default function App() {
       </div>
       <p className="label">{stepLabel(frets)}</p>
       {blockCount === 0 && <p className="note">No tab found on this page.</p>}
+      <RiffFooter url={view.url} />
     </main>
+  );
+}
+
+type Riff = { status: 'loading' } | { status: 'off' } | { status: 'on'; info: RiffTranspose | null };
+
+/**
+ * "Follow Riff": once on, tabs saved in Riff open transposed to the tuning set
+ * in Riff's sidebar (see entrypoints/background.ts).
+ */
+function RiffFooter({ url }: { url: string }) {
+  const [riff, setRiff] = useState<Riff>({ status: 'loading' });
+
+  const refresh = useCallback(async () => {
+    setRiff((await hasRiffAccess()) ? { status: 'on', info: await askRiff(url) } : { status: 'off' });
+  }, [url]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  if (riff.status === 'loading') return <footer className="riff" />;
+  if (riff.status === 'off') {
+    return (
+      <footer className="riff">
+        <button
+          type="button"
+          className="link"
+          title="Tabs saved in Riff open already transposed to the tuning you set in Riff"
+          // The permission prompt can close the popup; the grant still sticks.
+          onClick={() => requestRiffAccess().then(refresh, refresh)}
+        >
+          Follow Riff’s tuning…
+        </button>
+      </footer>
+    );
+  }
+  return (
+    <footer className="riff">
+      <span className="riff-status">{riffSummary(riff.info)}</span>
+      <button type="button" className="link" onClick={() => dropRiffAccess().then(refresh, refresh)}>
+        Turn off
+      </button>
+    </footer>
   );
 }

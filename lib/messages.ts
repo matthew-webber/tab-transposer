@@ -1,4 +1,4 @@
-/** Popup → content script (via tabs.sendMessage). */
+/** Popup or background → content script (via tabs.sendMessage). */
 export type ContentRequest = { type: 'get' } | { type: 'set'; frets: number };
 
 /** Content script reply to every ContentRequest. */

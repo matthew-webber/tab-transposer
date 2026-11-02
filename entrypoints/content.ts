@@ -120,8 +120,12 @@ function startTransposer() {
   }
 
   browser.runtime.onMessage.addListener((msg: ContentRequest, _sender, sendResponse) => {
-    if (msg?.type === 'set') setFrets(msg.frets);
-    else if (msg?.type === 'get') apply();
+    if (msg?.type === 'set') {
+      // A set right after an SPA navigation (from Riff) belongs to the new
+      // page, so the navigation check below mustn't reset it.
+      lastPage = pageKey();
+      setFrets(msg.frets);
+    } else if (msg?.type === 'get') apply();
     else return;
     const state: ContentState = { frets, blockCount };
     sendResponse(state);

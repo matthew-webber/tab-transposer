@@ -11,6 +11,9 @@ export default defineConfig({
     // permissions: it works on any tab site without an install warning, and
     // a reload naturally resets the transposition.
     permissions: ['activeTab', 'scripting'],
+    // Opt-in "Follow Riff" (lib/riff.ts): lets the background inject into
+    // tab pages as they load and ask the Riff app how far to transpose them.
+    optional_host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: 'Transpose tab',
       default_icon: {

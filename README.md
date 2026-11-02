@@ -10,6 +10,13 @@ a page is transposed. Reloading the page resets it.
 - Frets that would go below 0 jump up an octave (−1 → 11) and are highlighted.
 - Click the number, or press `0`, to reset. Arrow keys and +/− work too.
 
+## Follow Riff
+
+Click **Follow Riff's tuning…** in the popup and allow access to all sites. From then on,
+whenever a page that's saved in [Riff](../../riff-app) finishes loading, the extension
+asks Riff how far to shift it so it matches the **Tuned to** tuning set in Riff's sidebar,
+and transposes it automatically. The tooltip says why. Turn it off from the popup.
+
 ## Development
 
 ```sh
