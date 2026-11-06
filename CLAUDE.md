@@ -17,11 +17,14 @@ for relevant code changes. `bun run dev` starts WXT. `bun run icons` regenerates
 ## Architecture and constraints
 
 - `lib/tab-detect.ts`: pure. Finds stave blocks (≥4 consecutive lines with a
-  string label and/or bar and a dash-heavy body of tab characters only).
+  string label and/or bar and a dash-heavy body of tab characters only). Notes
+  after the closing bar (`|    4 Times`, `|x4`) are cut off the body and left
+  alone.
 - `lib/transpose.ts`: pure. Tokenizes frets (repeated digits like `6666` are
   separate strums; pairs ≤24 are one fret), shifts them (below 0 → +12, reported
   as wrapped), and realigns columns across strings when widths change.
   Always transpose from the original text, never from a previous result.
+  Shifts can be per string; "Ignore 6th string" holds line 6 of a block at 0.
 - `entrypoints/content.ts`: runtime-registered, injected by the popup, guarded
   against double injection. Edits only text-node data with `replaceData` (no
   element changes, so React-rendered pages survive) and restores exact
@@ -32,8 +35,9 @@ for relevant code changes. `bun run dev` starts WXT. `bun run icons` regenerates
   (`lib/riff.ts`, `GET http://127.0.0.1:47813/api/transpose`) on each page load
   or SPA navigation, then injects and sends `set` when Riff returns nonzero frets.
   Riff does all the tuning math.
-- `entrypoints/popup/App.tsx`: − value + control. The content script is the
-  source of truth.
+- `entrypoints/popup/App.tsx`: − value + control and the "Ignore 6th string"
+  checkbox (per page, like the shift). The content script is the source of
+  truth.
 
 Keep the minimal activeTab + scripting permissions with no required host
 permissions or declared content scripts. "Follow Riff" is the only thing that

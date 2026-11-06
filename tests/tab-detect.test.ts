@@ -62,3 +62,21 @@ test('handles CRLF line endings', () => {
   expect(block.lines[3].body).toBe('--3--|');
   expect(text.slice(block.lines[1].bodyStart, block.lines[1].bodyStart + 6)).toBe('--3--|');
 });
+
+test('a repeat note after the closing bar stays part of the stave', () => {
+  const text = [
+    'e|-------------------|',
+    'B|-------------------|',
+    'G|-------------------|',
+    'D|-------2-----2-----|',
+    'A|----5-----3--------|    4 Times',
+    'D|--3----------------|',
+  ].join('\n');
+  const [block] = detectBlocks(text);
+  expect(block.lines.length).toBe(6);
+  expect(block.lines[4].body).toBe('----5-----3--------|');
+  // The count isn't a fret, even where it would pass as tab characters.
+  expect(parseLine('A|--5--|x4')?.body).toBe('--5--|');
+  expect(parseLine('A|--5--|  (x4)')?.body).toBe('--5--|');
+  expect(parseLine('A|--5--|--7--')?.body).toBe('--5--|--7--');
+});

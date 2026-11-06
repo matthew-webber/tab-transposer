@@ -22,11 +22,21 @@ const PREFIX = /^(\s*)([A-Ga-g][#b]?)?(\s*)([|:])?/;
 // slide, vibrato, harmonics, ghost notes, mutes, taps). No other letters.
 const BODY = /^[-0-9|:hpbrxXsSvVtT/\\~().^*<>=+ ]+$/;
 
+/**
+ * Text after the closing bar that isn't more stave: a repeat count or note such
+ * as "|    4 Times", "|  x4" or "|(x3)". It has no "--" and is either spaced
+ * off from the bar or has letters in it.
+ */
+const isTrailingNote = (tail: string) =>
+  tail.trim() !== '' && !tail.includes('--') && (/^\s/.test(tail) || /[A-Za-z]/.test(tail));
+
 export function parseLine(line: string): { prefix: string; body: string } | null {
   const m = PREFIX.exec(line)!;
   if (!m[2] && !m[4]) return null;
   const prefix = m[0];
-  const body = line.slice(prefix.length).trimEnd();
+  let body = line.slice(prefix.length).trimEnd();
+  const bar = body.lastIndexOf('|');
+  if (bar >= 0 && isTrailingNote(body.slice(bar + 1))) body = body.slice(0, bar + 1);
   if (!body || !BODY.test(body) || !/--/.test(body)) return null;
   const dashes = body.split('-').length - 1;
   if (dashes / body.length < 0.15) return null;

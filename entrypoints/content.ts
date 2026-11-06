@@ -1,5 +1,5 @@
 import { detectBlocks } from '@/lib/tab-detect';
-import { transposeBodies } from '@/lib/transpose';
+import { stringShifts, transposeBodies } from '@/lib/transpose';
 import { clampFrets } from '@/lib/steps';
 import type { ContentRequest, ContentState, StateMessage } from '@/lib/messages';
 
@@ -34,6 +34,7 @@ interface Edit {
 
 function startTransposer() {
   let frets = 0;
+  let ignoreSixth = false;
   let blockCount = 0;
   /** Text nodes we rewrote: original data and what we wrote, for exact restore. */
   const touched = new Map<Text, { original: string; written: string }>();
@@ -76,7 +77,8 @@ function startTransposer() {
 
     const edits: Edit[] = [];
     for (const block of blocks) {
-      const { bodies, wrapped } = transposeBodies(block.lines.map((l) => l.body), frets);
+      const shifts = stringShifts(block.lines.length, frets, ignoreSixth);
+      const { bodies, wrapped } = transposeBodies(block.lines.map((l) => l.body), shifts);
       block.lines.forEach((line, i) => {
         if (bodies[i] === line.body) return;
         edits.push({
@@ -112,8 +114,9 @@ function startTransposer() {
     return blocks.length;
   }
 
-  function setFrets(next: number) {
+  function set(next: number, nextIgnoreSixth = ignoreSixth) {
     frets = clampFrets(next);
+    ignoreSixth = nextIgnoreSixth;
     apply();
     const msg: StateMessage = { type: 'tab-transposer/state', frets };
     browser.runtime.sendMessage(msg).catch(() => {});
@@ -124,10 +127,10 @@ function startTransposer() {
       // A set right after an SPA navigation (from Riff) belongs to the new
       // page, so the navigation check below mustn't reset it.
       lastPage = pageKey();
-      setFrets(msg.frets);
+      set(msg.frets, msg.ignoreSixth ?? ignoreSixth);
     } else if (msg?.type === 'get') apply();
     else return;
-    const state: ContentState = { frets, blockCount };
+    const state: ContentState = { frets, ignoreSixth, blockCount };
     sendResponse(state);
   });
 
@@ -138,7 +141,7 @@ function startTransposer() {
   setInterval(() => {
     if (pageKey() === lastPage) return;
     lastPage = pageKey();
-    if (frets) setFrets(0);
+    if (frets || ignoreSixth) set(0, false);
   }, 500);
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { detectBlocks } from '../lib/tab-detect.ts';
-import { shiftFret, tokenize, transposeBodies } from '../lib/transpose.ts';
+import { shiftFret, stringShifts, tokenize, transposeBodies } from '../lib/transpose.ts';
 
 const INTRO = [
   'e|-----------------------------------------------------------------|',
@@ -62,4 +62,29 @@ test('frets below zero move up an octave and are reported', () => {
 test('narrowing frets drops the extra column', () => {
   const lines = transpose(['e|--10--|', 'B|--8---|', 'G|------|', 'D|------|'], -1).lines;
   expect(lines).toEqual(['e|--9--|', 'B|--7--|', 'G|-----|', 'D|-----|']);
+});
+
+test('the 6th string can be left alone, keeping columns aligned', () => {
+  const drop = [
+    'e|----------|',
+    'B|----------|',
+    'G|----------|',
+    'D|------8---|',
+    'A|---5------|',
+    'D|--0---0---|',
+  ];
+  const [block] = detectBlocks(drop.join('\n'));
+  const shifts = stringShifts(block.lines.length, 2, true);
+  expect(shifts).toEqual([2, 2, 2, 2, 2, 0]);
+  const { bodies } = transposeBodies(block.lines.map((l) => l.body), shifts);
+  expect(bodies.map((b, i) => block.lines[i].prefix + b)).toEqual([
+    'e|-----------|',
+    'B|-----------|',
+    'G|-----------|',
+    'D|------10---|',
+    'A|---7-------|',
+    'D|--0---0----|',
+  ]);
+  // Bass staves have no 6th string.
+  expect(stringShifts(4, 2, true)).toEqual([2, 2, 2, 2]);
 });

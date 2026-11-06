@@ -98,9 +98,24 @@ function renderSlice(body: string, tokens: FretToken[], c: Cluster, frets: numbe
   return { text: text.replace(/-+$/, ''), wrapped };
 }
 
-/** Transposes every string body of a block. Always pass the original bodies. */
-export function transposeBodies(bodies: string[], frets: number): TransposedBlock {
-  if (!frets) return { bodies: [...bodies], wrapped: [] };
+/** Line index of the 6th string: staves list strings from the 1st (high e) down. */
+export const SIXTH_STRING = 5;
+
+/**
+ * Per-line shifts for a block of `lines` strings. With `ignoreSixth`, the 6th
+ * string stays put, e.g. playing a drop D tab on a guitar in D standard.
+ */
+export function stringShifts(lines: number, frets: number, ignoreSixth = false): number[] {
+  return Array.from({ length: lines }, (_, i) => (ignoreSixth && i === SIXTH_STRING ? 0 : frets));
+}
+
+/**
+ * Transposes every string body of a block, by one shift or one per string.
+ * Always pass the original bodies.
+ */
+export function transposeBodies(bodies: string[], frets: number | readonly number[]): TransposedBlock {
+  const shifts = typeof frets === 'number' ? bodies.map(() => frets) : frets;
+  if (!shifts.some(Boolean)) return { bodies: [...bodies], wrapped: [] };
   const tokens = bodies.map(tokenize);
   const out = bodies.map(() => '');
   const wrapped: WrappedFret[] = [];
@@ -111,7 +126,7 @@ export function transposeBodies(bodies: string[], frets: number): TransposedBloc
     bodies.forEach((b, i) => (out[i] += b.slice(cursor, c.start)));
     // Strings that end before this column (ragged staves) are left alone.
     const reaches = bodies.map((b) => b.length > c.start);
-    const slices = bodies.map((b, i) => renderSlice(b, tokens[i], c, frets));
+    const slices = bodies.map((b, i) => renderSlice(b, tokens[i], c, shifts[i] ?? 0));
     const width = Math.max(1, ...slices.map((s) => s.text.length));
     const grew = width > c.end - c.start;
     // Adjacent single-digit strums that became two digits need a separator,

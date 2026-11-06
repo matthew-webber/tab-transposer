@@ -103,6 +103,23 @@ body {
   color: var(--muted);
 }
 
+.option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .riff {
   width: 100%;
   min-height: 1.4em;

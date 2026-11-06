@@ -8,6 +8,8 @@ a page is transposed. Reloading the page resets it.
 - Only tab staves (`e|---3---|` lines) change. Chords, lyrics and notes don't.
 - Strings stay aligned when frets go from one digit to two (8 → 10).
 - Frets that would go below 0 jump up an octave (−1 → 11) and are highlighted.
+- **Ignore 6th string** leaves the low string as written, e.g. to play a drop D
+  tab on a guitar in D standard (+1 step, 6th string ignored).
 - Click the number, or press `0`, to reset. Arrow keys and +/− work too.
 
 ## Follow Riff

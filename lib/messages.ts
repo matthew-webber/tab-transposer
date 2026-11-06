@@ -1,9 +1,14 @@
-/** Popup or background → content script (via tabs.sendMessage). */
-export type ContentRequest = { type: 'get' } | { type: 'set'; frets: number };
+/**
+ * Popup or background → content script (via tabs.sendMessage). An omitted
+ * `ignoreSixth` keeps the page's current setting.
+ */
+export type ContentRequest = { type: 'get' } | { type: 'set'; frets: number; ignoreSixth?: boolean };
 
 /** Content script reply to every ContentRequest. */
 export interface ContentState {
   frets: number;
+  /** Leave the 6th string untransposed. */
+  ignoreSixth: boolean;
   blockCount: number;
 }
 

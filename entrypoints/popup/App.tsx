@@ -27,20 +27,22 @@ export default function App() {
     connect().then(setView, () => setView({ status: 'unavailable' }));
   }, []);
 
-  const change = useCallback(
-    (next: number) => {
+  const update = useCallback(
+    (next: { frets?: number; ignoreSixth?: boolean }) => {
       if (view.status !== 'ready') return;
-      const frets = clampFrets(next);
-      if (frets === view.frets) return;
+      const frets = clampFrets(next.frets ?? view.frets);
+      const ignoreSixth = next.ignoreSixth ?? view.ignoreSixth;
+      if (frets === view.frets && ignoreSixth === view.ignoreSixth) return;
       const id = ++latest.current;
-      setView({ ...view, frets });
-      request(view.tabId, { type: 'set', frets }).then(
+      setView({ ...view, frets, ignoreSixth });
+      request(view.tabId, { type: 'set', frets, ignoreSixth }).then(
         (state) => id === latest.current && setView((v) => (v.status === 'ready' ? { ...v, ...state } : v)),
         () => setView({ status: 'unavailable' }),
       );
     },
     [view],
   );
+  const change = useCallback((frets: number) => update({ frets }), [update]);
 
   useEffect(() => {
     if (view.status !== 'ready') return;
@@ -62,7 +64,7 @@ export default function App() {
     );
   }
 
-  const { frets, blockCount } = view;
+  const { frets, ignoreSixth, blockCount } = view;
   return (
     <main className="popup">
       <div className="control">
@@ -94,7 +96,18 @@ export default function App() {
         </button>
       </div>
       <p className="label">{stepLabel(frets)}</p>
-      {blockCount === 0 && <p className="note">No tab found on this page.</p>}
+      {blockCount === 0 ? (
+        <p className="note">No tab found on this page.</p>
+      ) : (
+        <label className="option" title="Leave the low string as written, e.g. for a drop D tab on a guitar in D standard">
+          <input
+            type="checkbox"
+            checked={ignoreSixth}
+            onChange={(e) => update({ ignoreSixth: e.target.checked })}
+          />
+          Ignore 6th string
+        </label>
+      )}
       <RiffFooter url={view.url} />
     </main>
   );
