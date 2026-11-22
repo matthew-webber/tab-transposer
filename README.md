@@ -9,7 +9,8 @@ a page is transposed. Reloading the page resets it.
 - Strings stay aligned when frets go from one digit to two (8 → 10).
 - Frets that would go below 0 jump up an octave (−1 → 11) and are highlighted.
 - **Ignore 6th string** leaves the low string as written, e.g. to play a drop D
-  tab on a guitar in D standard (+1 step, 6th string ignored).
+  tab on a guitar in D standard (+1 step, 6th string ignored). Follow Riff (below)
+  can move each string separately, so it handles drop and open tunings for you.
 - Click the number, or press `0`, to reset. Arrow keys and +/− work too.
 
 ## Follow Riff
@@ -17,7 +18,11 @@ a page is transposed. Reloading the page resets it.
 Click **Follow Riff's tuning…** in the popup and allow access to all sites. From then on,
 whenever a page that's saved in [Riff](../../riff-app) finishes loading, the extension
 asks Riff how far to shift it so it matches the **Tuned to** tuning set in Riff's sidebar,
-and transposes it automatically. The tooltip says why. Turn it off from the popup.
+and transposes it automatically. Riff gives a shift per string, so a Standard tab opened
+while you're in Drop D gets just its 6th string moved up a step (the badge shows `*` when
+only some strings moved). The popup's − / + still move every string on top of that, and
+resetting (click the number or press `0`) puts the tab back as written. The tooltip says
+why. Turn it off from the popup.
 
 ## Development
 

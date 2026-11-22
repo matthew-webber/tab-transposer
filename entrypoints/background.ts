@@ -1,6 +1,7 @@
-import { badgeText, clampFrets, stepLabel } from '@/lib/steps';
+import { badgeText, describeShifts } from '@/lib/steps';
 import { isStateMessage, type ContentRequest } from '@/lib/messages';
-import { askRiff, hasRiffAccess } from '@/lib/riff';
+import { askRiff, hasRiffAccess, riffShift } from '@/lib/riff';
+import { stringShifts } from '@/lib/transpose';
 
 const SIZES = [16, 32, 48, 128] as const;
 const iconSet = (dir: string) => Object.fromEntries(SIZES.map((s) => [s, `/${dir}/${s}.png`]));
@@ -11,8 +12,9 @@ const DEFAULT_TITLE = browser.runtime.getManifest().action?.default_title ?? 'Ta
 
 /** Page (URL without hash) each tab was last checked against Riff for. */
 const handled = new Map<number, string>();
-/** The shift Riff asked for in each tab, and its tooltip. */
-const fromRiff = new Map<number, { frets: number; title: string }>();
+/** The shift Riff asked for in each tab (frets and per-string offsets, as a key), and its tooltip. */
+const fromRiff = new Map<number, { key: string; title: string }>();
+const shiftKey = (frets: number, offsets: number[] | null) => JSON.stringify([frets, offsets]);
 
 export default defineBackground(() => {
   browser.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
@@ -21,7 +23,7 @@ export default defineBackground(() => {
   // The content script reports every change, including its own SPA resets.
   browser.runtime.onMessage.addListener((msg, sender) => {
     const tabId = sender.tab?.id;
-    if (isStateMessage(msg) && tabId != null) void show(tabId, msg.frets);
+    if (isStateMessage(msg) && tabId != null) void show(tabId, msg.frets, msg.offsets ?? null);
   });
 
   browser.tabs.onUpdated.addListener((tabId, info, tab) => {
@@ -29,7 +31,7 @@ export default defineBackground(() => {
     if (info.status === 'loading') {
       handled.delete(tabId);
       fromRiff.delete(tabId);
-      void show(tabId, 0);
+      void show(tabId, 0, null);
     }
     // Full loads finish with status "complete"; SPA navigations (pushState)
     // report just a new URL on an already-complete tab.
@@ -54,16 +56,18 @@ async function followRiff(tabId: number, url: string | undefined) {
   if (!(await hasRiffAccess())) return;
 
   const riff = await askRiff(url);
-  const frets = clampFrets(riff?.frets ?? 0);
-  if (!frets || !riff?.tab?.tuning) return;
+  const shift = riffShift(riff);
+  if (!shift || !riff?.tab?.tuning) return;
+  const { frets, offsets } = shift;
 
   try {
     // Skip if the tab moved on while we were asking.
     if ((await browser.tabs.get(tabId)).url?.split('#')[0] !== page) return;
-    const title = `${stepLabel(frets)} for ${riff.playTuning} (tab is in ${riff.tab.tuning}), via Riff`;
-    fromRiff.set(tabId, { frets, title });
+    const shifts = stringShifts(offsets?.length ?? 1, frets, false, offsets);
+    const title = `${describeShifts(shifts)} for ${riff.playTuning} (tab is in ${riff.tab.tuning}), via Riff`;
+    fromRiff.set(tabId, { key: shiftKey(frets, offsets), title });
     await browser.scripting.executeScript({ target: { tabId }, files: ['/content-scripts/content.js'] });
-    const msg: ContentRequest = { type: 'set', frets };
+    const msg: ContentRequest = { type: 'set', frets, offsets };
     await browser.tabs.sendMessage(tabId, msg);
   } catch {
     // Tab closed, or a page we can't script (e.g. the Web Store).
@@ -71,14 +75,16 @@ async function followRiff(tabId: number, url: string | undefined) {
   }
 }
 
-async function show(tabId: number, frets: number) {
+async function show(tabId: number, frets: number, offsets: number[] | null) {
   // The Riff tooltip only stands while the page is at the shift Riff asked for.
   const riff = fromRiff.get(tabId);
-  const title = riff && riff.frets === frets ? riff.title : DEFAULT_TITLE;
+  const title = riff && riff.key === shiftKey(frets, offsets) ? riff.title : DEFAULT_TITLE;
+  const active = Boolean(frets || offsets);
   try {
     await Promise.all([
-      browser.action.setBadgeText({ tabId, text: badgeText(frets) }),
-      browser.action.setIcon({ tabId, path: frets ? ACTIVE_ICON : IDLE_ICON }),
+      // "*": only some strings moved (e.g. just the 6th, for Drop D).
+      browser.action.setBadgeText({ tabId, text: badgeText(frets) || (active ? '*' : '') }),
+      browser.action.setIcon({ tabId, path: active ? ACTIVE_ICON : IDLE_ICON }),
       browser.action.setTitle({ tabId, title }),
     ]);
   } catch {

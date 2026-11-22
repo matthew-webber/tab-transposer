@@ -102,11 +102,19 @@ function renderSlice(body: string, tokens: FretToken[], c: Cluster, frets: numbe
 export const SIXTH_STRING = 5;
 
 /**
- * Per-line shifts for a block of `lines` strings. With `ignoreSixth`, the 6th
- * string stays put, e.g. playing a drop D tab on a guitar in D standard.
+ * Per-line shifts for a block of `lines` strings: `frets`, plus each string's
+ * entry in `offsets` (from a tuning change, 1st string first) when the block
+ * has that many strings. With `ignoreSixth`, the 6th string stays put, e.g.
+ * playing a drop D tab on a guitar in D standard.
  */
-export function stringShifts(lines: number, frets: number, ignoreSixth = false): number[] {
-  return Array.from({ length: lines }, (_, i) => (ignoreSixth && i === SIXTH_STRING ? 0 : frets));
+export function stringShifts(
+  lines: number,
+  frets: number,
+  ignoreSixth = false,
+  offsets: readonly number[] | null = null,
+): number[] {
+  const extra = offsets?.length === lines ? offsets : null;
+  return Array.from({ length: lines }, (_, i) => (ignoreSixth && i === SIXTH_STRING ? 0 : frets + (extra?.[i] ?? 0)));
 }
 
 /**

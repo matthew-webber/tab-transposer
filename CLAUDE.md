@@ -24,7 +24,9 @@ for relevant code changes. `bun run dev` starts WXT. `bun run icons` regenerates
   separate strums; pairs ≤24 are one fret), shifts them (below 0 → +12, reported
   as wrapped), and realigns columns across strings when widths change.
   Always transpose from the original text, never from a previous result.
-  Shifts can be per string; "Ignore 6th string" holds line 6 of a block at 0.
+  Shifts can be per string: `frets` plus optional per-string `offsets` (1st
+  string first, only for blocks with that many lines); "Ignore 6th string"
+  holds line 6 of a block at 0.
 - `entrypoints/content.ts`: runtime-registered, injected by the popup, guarded
   against double injection. Edits only text-node data with `replaceData` (no
   element changes, so React-rendered pages survive) and restores exact
@@ -33,10 +35,13 @@ for relevant code changes. `bun run dev` starts WXT. `bun run icons` regenerates
 - `entrypoints/background.ts`: per-tab badge text and idle/active icon, cleared
   when the tab starts loading. With "Follow Riff" on, it also asks the Riff app
   (`lib/riff.ts`, `GET http://127.0.0.1:47813/api/transpose`) on each page load
-  or SPA navigation, then injects and sends `set` when Riff returns nonzero frets.
-  Riff does all the tuning math.
+  or SPA navigation, then injects and sends `set` when Riff's shift moves anything.
+  Riff does all the tuning math and returns `strings` (per-string frets, 1st string
+  first) plus `frets` when they're all equal; `splitShifts` turns that into the
+  common `frets` and per-string `offsets`.
 - `entrypoints/popup/App.tsx`: − value + control and the "Ignore 6th string"
-  checkbox (per page, like the shift). The content script is the source of
+  checkbox (per page, like the shift). − / + move `frets` and keep `offsets`;
+  reset clears both. The content script is the source of
   truth.
 
 Keep the minimal activeTab + scripting permissions with no required host

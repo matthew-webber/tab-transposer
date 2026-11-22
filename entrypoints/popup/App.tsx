@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clampFrets, formatSteps, MAX_FRETS, stepLabel } from '@/lib/steps';
+import { clampFrets, describeShifts, formatSteps, MAX_FRETS, stepLabel } from '@/lib/steps';
+import { stringShifts } from '@/lib/transpose';
 import type { ContentRequest, ContentState } from '@/lib/messages';
 import { askRiff, dropRiffAccess, hasRiffAccess, requestRiffAccess, riffSummary, type RiffTranspose } from '@/lib/riff';
 
@@ -28,14 +29,15 @@ export default function App() {
   }, []);
 
   const update = useCallback(
-    (next: { frets?: number; ignoreSixth?: boolean }) => {
+    (next: { frets?: number; ignoreSixth?: boolean; offsets?: null }) => {
       if (view.status !== 'ready') return;
       const frets = clampFrets(next.frets ?? view.frets);
       const ignoreSixth = next.ignoreSixth ?? view.ignoreSixth;
-      if (frets === view.frets && ignoreSixth === view.ignoreSixth) return;
+      const offsets = next.offsets === undefined ? view.offsets : null;
+      if (frets === view.frets && ignoreSixth === view.ignoreSixth && offsets === view.offsets) return;
       const id = ++latest.current;
-      setView({ ...view, frets, ignoreSixth });
-      request(view.tabId, { type: 'set', frets, ignoreSixth }).then(
+      setView({ ...view, frets, ignoreSixth, offsets });
+      request(view.tabId, { type: 'set', frets, ignoreSixth, offsets }).then(
         (state) => id === latest.current && setView((v) => (v.status === 'ready' ? { ...v, ...state } : v)),
         () => setView({ status: 'unavailable' }),
       );
@@ -43,17 +45,19 @@ export default function App() {
     [view],
   );
   const change = useCallback((frets: number) => update({ frets }), [update]);
+  // Back to the tab as written, including per-string moves from a tuning change.
+  const reset = useCallback(() => update({ frets: 0, offsets: null }), [update]);
 
   useEffect(() => {
     if (view.status !== 'ready') return;
     const onKey = (e: KeyboardEvent) => {
       if (['ArrowUp', 'ArrowRight', '+', '='].includes(e.key)) change(view.frets + 1);
       else if (['ArrowDown', 'ArrowLeft', '-'].includes(e.key)) change(view.frets - 1);
-      else if (e.key === '0') change(0);
+      else if (e.key === '0') reset();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [view, change]);
+  }, [view, change, reset]);
 
   if (view.status === 'loading') return <main className="popup" />;
   if (view.status === 'unavailable') {
@@ -64,7 +68,8 @@ export default function App() {
     );
   }
 
-  const { frets, ignoreSixth, blockCount } = view;
+  const { frets, ignoreSixth, offsets, blockCount } = view;
+  const shifted = Boolean(frets || offsets);
   return (
     <main className="popup">
       <div className="control">
@@ -78,10 +83,10 @@ export default function App() {
           −
         </button>
         <output
-          className={frets ? 'value active' : 'value'}
+          className={shifted ? 'value active' : 'value'}
           aria-live="polite"
-          title={frets ? 'Click to reset' : undefined}
-          onClick={() => change(0)}
+          title={shifted ? 'Click to reset' : undefined}
+          onClick={reset}
         >
           {formatSteps(frets)}
         </output>
@@ -95,7 +100,9 @@ export default function App() {
           +
         </button>
       </div>
-      <p className="label">{stepLabel(frets)}</p>
+      <p className="label">
+        {offsets ? describeShifts(stringShifts(offsets.length, frets, ignoreSixth, offsets)) : stepLabel(frets)}
+      </p>
       {blockCount === 0 ? (
         <p className="note">No tab found on this page.</p>
       ) : (

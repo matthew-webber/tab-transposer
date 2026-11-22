@@ -5,6 +5,8 @@
 // click), so it's opt-in from the popup as an optional permission. That access
 // also covers Riff's loopback API.
 
+import { splitShifts } from './steps';
+
 export const RIFF_API = 'http://127.0.0.1:47813/api';
 export const PAGE_ORIGINS = ['http://*/*', 'https://*/*'];
 
@@ -14,8 +16,14 @@ export interface RiffTranspose {
   playTuning: string | null;
   /** The saved tab for this URL, or null when it isn't in the library. */
   tab: { title: string; artist: string; tuning: string | null } | null;
-  /** Frets to shift (positive = up); null when there's nothing to do or the tunings can't be matched by a shift. */
+  /** Frets to shift every string (positive = up), when they all move the same amount. */
   frets: number | null;
+  /**
+   * Frets to shift each string, 1st (high) string first, e.g. [0,0,0,0,0,2]
+   * for a Standard tab played in Drop D. Null when there's nothing to do or
+   * the tunings can't be matched. Missing from Riff versions before this.
+   */
+  strings?: number[] | null;
 }
 
 export const hasRiffAccess = () => browser.permissions.contains({ origins: PAGE_ORIGINS });
@@ -24,6 +32,14 @@ export const hasRiffAccess = () => browser.permissions.contains({ origins: PAGE_
 export const requestRiffAccess = () => browser.permissions.request({ origins: PAGE_ORIGINS });
 
 export const dropRiffAccess = () => browser.permissions.remove({ origins: PAGE_ORIGINS });
+
+/** The shift Riff asks for, split like the content script's state. Null when nothing moves. */
+export function riffShift(riff: RiffTranspose | null): { frets: number; offsets: number[] | null } | null {
+  const shifts = riff?.strings ?? (riff?.frets != null ? [riff.frets] : null);
+  if (!shifts || !riff?.tab?.tuning) return null;
+  const split = splitShifts(shifts);
+  return split.frets || split.offsets ? split : null;
+}
 
 /** Asks Riff how to transpose `url`. Null if Riff isn't running or didn't answer. */
 export async function askRiff(url: string): Promise<RiffTranspose | null> {
@@ -49,7 +65,7 @@ export function riffSummary(riff: RiffTranspose | null): string {
   if (!riff.playTuning) return 'Following Riff. No tuning set in Riff.';
   const from = riff.tab?.tuning;
   if (!from) return `Following Riff: tuned to ${riff.playTuning}.`;
-  if (riff.frets == null) return `Riff: can’t shift ${from} to ${riff.playTuning}.`;
+  if (riff.frets == null && !riff.strings) return `Riff: can’t match ${from} to ${riff.playTuning}.`;
   if (from === riff.playTuning) return `Riff: already in ${from}.`;
   return `Riff: ${from} → ${riff.playTuning}`;
 }

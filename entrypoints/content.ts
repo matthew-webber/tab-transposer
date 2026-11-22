@@ -35,6 +35,7 @@ interface Edit {
 function startTransposer() {
   let frets = 0;
   let ignoreSixth = false;
+  let offsets: number[] | null = null;
   let blockCount = 0;
   /** Text nodes we rewrote: original data and what we wrote, for exact restore. */
   const touched = new Map<Text, { original: string; written: string }>();
@@ -67,17 +68,17 @@ function startTransposer() {
     blockCount = 0;
     for (const container of findContainers()) blockCount += transposeContainer(container);
     // Re-apply after the page (e.g. a React re-render) replaces the tab text.
-    if (frets) observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    if (frets || offsets) observer.observe(document.body, { subtree: true, childList: true, characterData: true });
   }
 
   function transposeContainer(container: Element): number {
     const { text, segments } = collectText(container);
     const blocks = detectBlocks(text);
-    if (!frets) return blocks.length;
+    if (!frets && !offsets) return blocks.length;
 
     const edits: Edit[] = [];
     for (const block of blocks) {
-      const shifts = stringShifts(block.lines.length, frets, ignoreSixth);
+      const shifts = stringShifts(block.lines.length, frets, ignoreSixth, offsets);
       const { bodies, wrapped } = transposeBodies(block.lines.map((l) => l.body), shifts);
       block.lines.forEach((line, i) => {
         if (bodies[i] === line.body) return;
@@ -114,11 +115,12 @@ function startTransposer() {
     return blocks.length;
   }
 
-  function set(next: number, nextIgnoreSixth = ignoreSixth) {
+  function set(next: number, nextIgnoreSixth = ignoreSixth, nextOffsets = offsets) {
     frets = clampFrets(next);
     ignoreSixth = nextIgnoreSixth;
+    offsets = validOffsets(nextOffsets);
     apply();
-    const msg: StateMessage = { type: 'tab-transposer/state', frets };
+    const msg: StateMessage = { type: 'tab-transposer/state', frets, offsets };
     browser.runtime.sendMessage(msg).catch(() => {});
   }
 
@@ -127,10 +129,10 @@ function startTransposer() {
       // A set right after an SPA navigation (from Riff) belongs to the new
       // page, so the navigation check below mustn't reset it.
       lastPage = pageKey();
-      set(msg.frets, msg.ignoreSixth ?? ignoreSixth);
+      set(msg.frets, msg.ignoreSixth ?? ignoreSixth, msg.offsets === undefined ? offsets : msg.offsets);
     } else if (msg?.type === 'get') apply();
     else return;
-    const state: ContentState = { frets, ignoreSixth, blockCount };
+    const state: ContentState = { frets, ignoreSixth, offsets, blockCount };
     sendResponse(state);
   });
 
@@ -141,8 +143,15 @@ function startTransposer() {
   setInterval(() => {
     if (pageKey() === lastPage) return;
     lastPage = pageKey();
-    if (frets || ignoreSixth) set(0, false);
+    if (frets || ignoreSixth || offsets) set(0, false, null);
   }, 500);
+}
+
+/** Small whole-fret offsets, or null when there are none to apply. */
+function validOffsets(offsets: unknown): number[] | null {
+  if (!Array.isArray(offsets) || offsets.length > 8) return null;
+  const out = offsets.map((o) => clampFrets(Number(o)));
+  return out.some(Boolean) ? out : null;
 }
 
 /** Outermost elements with preserved whitespace that contain dash-heavy text. */

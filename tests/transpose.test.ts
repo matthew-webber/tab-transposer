@@ -88,3 +88,31 @@ test('the 6th string can be left alone, keeping columns aligned', () => {
   // Bass staves have no 6th string.
   expect(stringShifts(4, 2, true)).toEqual([2, 2, 2, 2]);
 });
+
+test('per-string offsets retune single strings, e.g. a Standard tab played in Drop D', () => {
+  const standard = [
+    'e|----------|',
+    'B|----------|',
+    'G|----------|',
+    'D|------7---|',
+    'A|---5------|',
+    'E|--3---8---|',
+  ];
+  const [block] = detectBlocks(standard.join('\n'));
+  const shifts = stringShifts(block.lines.length, 0, false, [0, 0, 0, 0, 0, 2]);
+  expect(shifts).toEqual([0, 0, 0, 0, 0, 2]);
+  const { bodies } = transposeBodies(block.lines.map((l) => l.body), shifts);
+  expect(bodies.map((b, i) => block.lines[i].prefix + b)).toEqual([
+    'e|-----------|',
+    'B|-----------|',
+    'G|-----------|',
+    'D|------7----|',
+    'A|---5-------|',
+    'E|--5---10---|',
+  ]);
+  // Offsets add to the − / + shift, and Ignore 6th string still holds it at 0.
+  expect(stringShifts(6, 1, false, [0, 0, 0, 0, 0, 2])).toEqual([1, 1, 1, 1, 1, 3]);
+  expect(stringShifts(6, 1, true, [0, 0, 0, 0, 0, 2])).toEqual([1, 1, 1, 1, 1, 0]);
+  // Staves with a different string count (e.g. bass) only get the common shift.
+  expect(stringShifts(4, 1, false, [0, 0, 0, 0, 0, 2])).toEqual([1, 1, 1, 1]);
+});

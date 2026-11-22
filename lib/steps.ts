@@ -25,3 +25,35 @@ export function stepLabel(frets: number): string {
   const amount = whole === 0 ? '½' : `${whole}${n % 2 ? '½' : ''}`;
   return `${frets > 0 ? 'Up' : 'Down'} ${amount} ${n <= 2 ? 'step' : 'steps'}`;
 }
+
+/**
+ * Splits per-string shifts (1st string first) into the amount most strings
+ * move, which the − / + control then adjusts, and each string's difference
+ * from it (null when every string moves the same). Ties go to the smaller move.
+ */
+export function splitShifts(shifts: readonly number[]): { frets: number; offsets: number[] | null } {
+  const counts = new Map<number, number>();
+  for (const s of shifts) counts.set(s, (counts.get(s) ?? 0) + 1);
+  let base = 0;
+  let best = -1;
+  for (const [s, n] of counts) if (n > best || (n === best && Math.abs(s) < Math.abs(base))) [base, best] = [s, n];
+  const frets = clampFrets(base);
+  const offsets = shifts.map((s) => s - frets);
+  return { frets, offsets: offsets.some(Boolean) ? offsets : null };
+}
+
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+
+/** "6th string up 1 step", "Up 1 step, 6th string as written"; empty when nothing moves. */
+export function describeShifts(shifts: readonly number[]): string {
+  const { frets, offsets } = splitShifts(shifts);
+  const groups = new Map<number, string[]>();
+  offsets?.forEach((o, i) => o && groups.set(frets + o, [...(groups.get(frets + o) ?? []), ORDINALS[i] ?? `${i + 1}th`]));
+  const parts = frets ? [stepLabel(frets)] : [];
+  for (const [shift, names] of groups) {
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+    parts.push(`${list} string${names.length > 1 ? 's' : ''} ${shift ? stepLabel(shift).toLowerCase() : 'as written'}`);
+  }
+  const text = parts.join(', ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
